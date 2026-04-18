@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>See Green Foundation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #viewer {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+  }
+
+  #poster-container {
+    position: relative;
+    width: 100%; 
+    max-width: 100vw;
+    max-height: 100vh;
+    aspect-ratio: 834 / 1112;
+    overflow: hidden;
+  }
+
+  #poster-img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  #video-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    z-index: 2;
+  }
+  #video-overlay.visible { opacity: 1; }
+
+  #scan-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, rgba(0,255,136,0.8), transparent);
+    box-shadow: 0 0 15px rgba(0,255,136,0.5), 0 0 40px rgba(0,255,136,0.2);
+    z-index: 5;
+    opacity: 0;
+  }
+  #scan-line.scanning {
+    opacity: 1;
+    animation: scanDown 1.5s ease-in-out forwards;
+  }
+  @keyframes scanDown {
+    0% { top: 0; opacity: 1; }
+    80% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .corner {
+    position: absolute;
+    width: 30px; height: 30px;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .corner.visible { opacity: 1; }
+  .corner.tl { top: 8px; left: 8px; border-top: 2px solid #0f8; border-left: 2px solid #0f8; }
+  .corner.tr { top: 8px; right: 8px; border-top: 2px solid #0f8; border-right: 2px solid #0f8; }
+  .corner.bl { bottom: 8px; left: 8px; border-bottom: 2px solid #0f8; border-left: 2px solid #0f8; }
+  .corner.br { bottom: 8px; right: 8px; border-bottom: 2px solid #0f8; border-right: 2px solid #0f8; }
+
+  #status {
+    position: fixed;
+    bottom: 40px; left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.6);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    z-index: 10;
+    transition: opacity 0.5s ease;
+  }
+  #status.hidden { opacity: 0; }
+
+  #replayBtn {
+    position: fixed;
+    bottom: 30px; right: 30px;
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 20;
+    transition: all 0.3s ease;
+  }
+  #replayBtn:active { transform: scale(0.9); }
+  #replayBtn.visible { display: flex; }
+
+  #unmute-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.3);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 50;
+    cursor: pointer;
+  }
+  #unmute-overlay.visible { display: flex; }
+  #unmute-overlay span {
+    color: #fff;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 12px 24px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 30px;
+    backdrop-filter: blur(10px);
+    background: rgba(0,0,0,0.4);
+  }
+</style>
+</head>
+<body>
+
+<div id="viewer">
+  <div id="poster-container">
+    <img id="poster-img" src="poster.jpg" alt="Poster">
+    <video id="video-overlay" src="video.mp4" playsinline webkit-playsinline preload="auto"></video>
+    <div id="scan-line"></div>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+  </div>
+</div>
+
+<div id="status">Detecting poster…</div>
+
+<div id="unmute-overlay"><span>Tap for sound</span></div>
+
+<button id="replayBtn" aria-label="Replay">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+  </svg>
+</button>
+
+<script>
+  const video = document.getElementById('video-overlay');
+  const scanLine = document.getElementById('scan-line');
+  const corners = document.querySelectorAll('.corner');
+  const status = document.getElementById('status');
+  const replayBtn = document.getElementById('replayBtn');
+  const unmuteOverlay = document.getElementById('unmute-overlay');
+
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      corners.forEach(c => c.classList.add('visible'));
+      status.textContent = 'Poster found';
+    }, 500);
+
+    setTimeout(() => {
+      scanLine.classList.add('scanning');
+      status.textContent = 'Scanning…';
+    }, 1000);
+
+    setTimeout(() => {
+      status.textContent = 'Playing';
+      video.classList.add('visible');
+      video.currentTime = 0;
+      video.muted = false;
+      video.play().then(() => {
+        setTimeout(() => {
+          status.classList.add('hidden');
+          corners.forEach(c => c.classList.remove('visible'));
+        }, 1000);
+      }).catch(() => {
+        video.muted = true;
+        video.play();
+        unmuteOverlay.classList.add('visible');
+        setTimeout(() => {
+          status.classList.add('hidden');
+          corners.forEach(c => c.classList.remove('visible'));
+        }, 1000);
+      });
+    }, 2200);
+
+    video.onended = () => {
+      video.classList.remove('visible');
+      replayBtn.classList.add('visible');
+      status.textContent = 'Tap replay to watch again';
+      status.classList.remove('hidden');
+    };
+  });
+
+  unmuteOverlay.addEventListener('click', () => {
+    video.muted = false;
+    video.play();
+    unmuteOverlay.classList.remove('visible');
+  });
+
+  function replay() {
+    replayBtn.classList.remove('visible');
+    status.classList.remove('hidden');
+    scanLine.classList.remove('scanning');
+    void scanLine.offsetWidth;
+    corners.forEach(c => c.classList.add('visible'));
+    status.textContent = 'Scanning…';
+    scanLine.classList.add('scanning');
+    setTimeout(() => {
+      status.textContent = 'Playing';
+      video.classList.add('visible');
+      video.muted = false;
+      video.currentTime = 0;
+      video.play().catch(() => {});
+      setTimeout(() => {
+        status.classList.add('hidden');
+        corners.forEach(c => c.classList.remove('visible'));
+      }, 1000);
+    }, 1200);
+  }
+
+  replayBtn.addEventListener('click', replay);
+</script>
+</body>
+</html>
